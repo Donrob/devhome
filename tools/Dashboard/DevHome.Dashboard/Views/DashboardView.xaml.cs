@@ -300,8 +300,9 @@ public partial class DashboardView : ToolPage, IDisposable
         foreach (var orderedWidget in restoredWidgetsWithPosition)
         {
             var widget = orderedWidget.Value;
-            var size = await widget.GetSizeAsync();
-            await InsertWidgetInPinnedWidgetsAsync(widget, size, finalPlace++);
+            var comSafeWidget = new ComSafeWidget(widget);
+            var size = await comSafeWidget.GetSizeAsync();
+            await InsertWidgetInPinnedWidgetsAsync(comSafeWidget, size, finalPlace++);
         }
 
         // Go through the newly created list of pinned widgets and update any positions that may have changed.
@@ -360,6 +361,7 @@ public partial class DashboardView : ToolPage, IDisposable
             var size = WidgetHelpers.GetDefaultWidgetSize(defaultWidgetDefinition.GetWidgetCapabilities());
             var id = defaultWidgetDefinition.Id;
             var newWidget = await Task.Run(async () => await widgetHost?.CreateWidgetAsync(id, size));
+            var comSafeWidget = new ComSafeWidget(newWidget);
             _log.Information($"Created default widget {id}");
 
             // Set custom state on new widget.
@@ -369,7 +371,7 @@ public partial class DashboardView : ToolPage, IDisposable
             await newWidget.SetCustomStateAsync(newCustomState);
 
             // Put new widget on the Dashboard.
-            await InsertWidgetInPinnedWidgetsAsync(newWidget, size, position);
+            await InsertWidgetInPinnedWidgetsAsync(comSafeWidget, size, position);
             _log.Information($"Inserted default widget {id} at position {position}");
         }
         catch (Exception ex)
@@ -412,6 +414,7 @@ public partial class DashboardView : ToolPage, IDisposable
                 var size = WidgetHelpers.GetDefaultWidgetSize(newWidgetDefinition.GetWidgetCapabilities());
                 var widgetHost = await ViewModel.WidgetHostingService.GetWidgetHostAsync();
                 newWidget = await Task.Run(async () => await widgetHost?.CreateWidgetAsync(newWidgetDefinition.Id, size));
+                var comSafeWidget = new ComSafeWidget(newWidget);
 
                 // Set custom state on new widget.
                 var position = PinnedWidgets.Count;
@@ -420,7 +423,7 @@ public partial class DashboardView : ToolPage, IDisposable
                 await newWidget.SetCustomStateAsync(newCustomState);
 
                 // Put new widget on the Dashboard.
-                await InsertWidgetInPinnedWidgetsAsync(newWidget, size, position);
+                await InsertWidgetInPinnedWidgetsAsync(comSafeWidget, size, position);
             }
             catch (Exception ex)
             {
@@ -435,7 +438,7 @@ public partial class DashboardView : ToolPage, IDisposable
         }
     }
 
-    private async Task InsertWidgetInPinnedWidgetsAsync(Widget widget, WidgetSize size, int index)
+    private async Task InsertWidgetInPinnedWidgetsAsync(ComSafeWidget widget, WidgetSize size, int index)
     {
         await Task.Run(async () =>
         {
