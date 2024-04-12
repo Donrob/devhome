@@ -501,7 +501,8 @@ public partial class DashboardView : ToolPage, IDisposable
 
     private async void WidgetCatalog_WidgetDefinitionUpdated(WidgetCatalog sender, WidgetDefinitionUpdatedEventArgs args)
     {
-        var updatedDefinitionId = args.Definition.Id;
+        var comSafeNewDefinition = new ComSafeWidgetDefinition(args.Definition);
+        var updatedDefinitionId = comSafeNewDefinition.Id;
         _log.Information($"WidgetCatalog_WidgetDefinitionUpdated {updatedDefinitionId}");
 
         var matchingWidgetsFound = 0;
@@ -511,15 +512,13 @@ public partial class DashboardView : ToolPage, IDisposable
             // Things in the definition that we need to update to if they have changed:
             // AllowMultiple, DisplayTitle, Capabilities (size), ThemeResource (icons)
             var oldDef = widgetToUpdate.WidgetDefinition;
-            var unsafeNewDef = args.Definition;
-            var comSafeNewDef = new ComSafeWidgetDefinition(unsafeNewDef);
 
             // If we're no longer allowed to have multiple instances of this widget, delete all but the first.
-            if (++matchingWidgetsFound > 1 && comSafeNewDef.AllowMultiple == false && oldDef.AllowMultiple == true)
+            if (++matchingWidgetsFound > 1 && comSafeNewDefinition.AllowMultiple == false && oldDef.AllowMultiple == true)
             {
                 _windowEx.DispatcherQueue.TryEnqueue(async () =>
                 {
-                    _log.Information($"No longer allowed to have multiple of widget {comSafeNewDef.Id}");
+                    _log.Information($"No longer allowed to have multiple of widget {updatedDefinitionId}");
                     _log.Information($"Delete widget {widgetToUpdate.Widget.Id}");
                     PinnedWidgets.Remove(widgetToUpdate);
                     await widgetToUpdate.Widget.DeleteAsync();
@@ -529,19 +528,19 @@ public partial class DashboardView : ToolPage, IDisposable
             else
             {
                 // Changing the definition updates the DisplayTitle.
-                widgetToUpdate.WidgetDefinition = comSafeNewDef;
+                widgetToUpdate.WidgetDefinition = comSafeNewDefinition;
 
                 // If the size the widget is currently set to is no longer supported by the widget, revert to its default size.
                 // TODO: Need to update WidgetControl with now-valid sizes.
                 // TODO: Properly compare widget capabilities.
                 // https://github.com/microsoft/devhome/issues/641
-                if (await oldDef.GetWidgetCapabilitiesAsync() != await comSafeNewDef.GetWidgetCapabilitiesAsync())
+                if (await oldDef.GetWidgetCapabilitiesAsync() != await comSafeNewDefinition.GetWidgetCapabilitiesAsync())
                 {
                     // TODO: handle the case where this change is made while Dev Home is not running -- how do we restore?
                     // https://github.com/microsoft/devhome/issues/641
-                    if (!(await comSafeNewDef.GetWidgetCapabilitiesAsync()).Any(cap => cap.Size == widgetToUpdate.WidgetSize))
+                    if (!(await comSafeNewDefinition.GetWidgetCapabilitiesAsync()).Any(cap => cap.Size == widgetToUpdate.WidgetSize))
                     {
-                        var newDefaultSize = WidgetHelpers.GetDefaultWidgetSize(await comSafeNewDef.GetWidgetCapabilitiesAsync());
+                        var newDefaultSize = WidgetHelpers.GetDefaultWidgetSize(await comSafeNewDefinition.GetWidgetCapabilitiesAsync());
                         widgetToUpdate.WidgetSize = newDefaultSize;
                         await widgetToUpdate.Widget.SetSizeAsync(newDefaultSize);
                     }
