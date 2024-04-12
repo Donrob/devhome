@@ -340,25 +340,26 @@ public partial class DashboardView : ToolPage, IDisposable
             return;
         }
 
-        var widgetDefinitions = await Task.Run(() => catalog!.GetWidgetDefinitions().OrderBy(x => x.DisplayTitle));
-        foreach (var widgetDefinition in widgetDefinitions)
+        var widgetDefinitions = await Task.Run(() => catalog!.GetWidgetDefinitions());
+        var comSafeWidgetDefinitions = widgetDefinitions.Select(x => new ComSafeWidgetDefinition(x)).OrderBy(x => x.DisplayTitle);
+        foreach (var comSafeWidgetDefinition in comSafeWidgetDefinitions)
         {
-            var id = widgetDefinition.Id;
+            var id = comSafeWidgetDefinition.Id;
             if (WidgetHelpers.DefaultWidgetDefinitionIds.Contains(id))
             {
                 _log.Information($"Found default widget {id}");
-                await PinDefaultWidgetAsync(widgetDefinition);
+                await PinDefaultWidgetAsync(comSafeWidgetDefinition);
             }
         }
     }
 
-    private async Task PinDefaultWidgetAsync(WidgetDefinition defaultWidgetDefinition)
+    private async Task PinDefaultWidgetAsync(ComSafeWidgetDefinition defaultWidgetDefinition)
     {
         try
         {
             // Create widget
             var widgetHost = await ViewModel.WidgetHostingService.GetWidgetHostAsync();
-            var size = WidgetHelpers.GetDefaultWidgetSize(defaultWidgetDefinition.GetWidgetCapabilities());
+            var size = WidgetHelpers.GetDefaultWidgetSize(await defaultWidgetDefinition.GetWidgetCapabilitiesAsync());
             var id = defaultWidgetDefinition.Id;
             var newWidget = await Task.Run(async () => await widgetHost?.CreateWidgetAsync(id, size));
             var comSafeWidget = new ComSafeWidget(newWidget);
@@ -411,7 +412,7 @@ public partial class DashboardView : ToolPage, IDisposable
             Widget newWidget;
             try
             {
-                var size = WidgetHelpers.GetDefaultWidgetSize(newWidgetDefinition.GetWidgetCapabilities());
+                var size = WidgetHelpers.GetDefaultWidgetSize(await newWidgetDefinition.GetWidgetCapabilitiesAsync());
                 var widgetHost = await ViewModel.WidgetHostingService.GetWidgetHostAsync();
                 newWidget = await Task.Run(async () => await widgetHost?.CreateWidgetAsync(newWidgetDefinition.Id, size));
                 var comSafeWidget = new ComSafeWidget(newWidget);
@@ -445,18 +446,19 @@ public partial class DashboardView : ToolPage, IDisposable
             var widgetDefinitionId = widget.DefinitionId;
             var widgetId = widget.Id;
             var widgetCatalog = await ViewModel.WidgetHostingService.GetWidgetCatalogAsync();
-            var widgetDefinition = await Task.Run(() => widgetCatalog?.GetWidgetDefinition(widgetDefinitionId));
+            var unsafeWidgetDefinition = await Task.Run(() => widgetCatalog?.GetWidgetDefinition(widgetDefinitionId));
 
-            if (widgetDefinition != null)
+            if (unsafeWidgetDefinition != null)
             {
+                var comSafeWidgetDefinition = new ComSafeWidgetDefinition(unsafeWidgetDefinition);
                 _log.Information($"Insert widget in pinned widgets, id = {widgetId}, index = {index}");
 
                 TelemetryFactory.Get<ITelemetry>().Log(
                     "Dashboard_ReportPinnedWidget",
                     LogLevel.Critical,
-                    new ReportPinnedWidgetEvent(widgetDefinition.ProviderDefinition.Id, widgetDefinitionId));
+                    new ReportPinnedWidgetEvent(comSafeWidgetDefinition.ProviderDefinition.Id, widgetDefinitionId));
 
-                var wvm = _widgetViewModelFactory(widget, size, widgetDefinition);
+                var wvm = _widgetViewModelFactory(widget, size, comSafeWidgetDefinition);
                 _windowEx.DispatcherQueue.TryEnqueue(() =>
                 {
                     try
@@ -509,14 +511,15 @@ public partial class DashboardView : ToolPage, IDisposable
             // Things in the definition that we need to update to if they have changed:
             // AllowMultiple, DisplayTitle, Capabilities (size), ThemeResource (icons)
             var oldDef = widgetToUpdate.WidgetDefinition;
-            var newDef = args.Definition;
+            var unsafeNewDef = args.Definition;
+            var comSafeNewDef = new ComSafeWidgetDefinition(unsafeNewDef);
 
             // If we're no longer allowed to have multiple instances of this widget, delete all but the first.
-            if (++matchingWidgetsFound > 1 && newDef.AllowMultiple == false && oldDef.AllowMultiple == true)
+            if (++matchingWidgetsFound > 1 && comSafeNewDef.AllowMultiple == false && oldDef.AllowMultiple == true)
             {
                 _windowEx.DispatcherQueue.TryEnqueue(async () =>
                 {
-                    _log.Information($"No longer allowed to have multiple of widget {newDef.Id}");
+                    _log.Information($"No longer allowed to have multiple of widget {comSafeNewDef.Id}");
                     _log.Information($"Delete widget {widgetToUpdate.Widget.Id}");
                     PinnedWidgets.Remove(widgetToUpdate);
                     await widgetToUpdate.Widget.DeleteAsync();
@@ -526,19 +529,19 @@ public partial class DashboardView : ToolPage, IDisposable
             else
             {
                 // Changing the definition updates the DisplayTitle.
-                widgetToUpdate.WidgetDefinition = newDef;
+                widgetToUpdate.WidgetDefinition = comSafeNewDef;
 
                 // If the size the widget is currently set to is no longer supported by the widget, revert to its default size.
                 // TODO: Need to update WidgetControl with now-valid sizes.
                 // TODO: Properly compare widget capabilities.
                 // https://github.com/microsoft/devhome/issues/641
-                if (oldDef.GetWidgetCapabilities() != newDef.GetWidgetCapabilities())
+                if (await oldDef.GetWidgetCapabilitiesAsync() != await comSafeNewDef.GetWidgetCapabilitiesAsync())
                 {
                     // TODO: handle the case where this change is made while Dev Home is not running -- how do we restore?
                     // https://github.com/microsoft/devhome/issues/641
-                    if (!newDef.GetWidgetCapabilities().Any(cap => cap.Size == widgetToUpdate.WidgetSize))
+                    if (!(await comSafeNewDef.GetWidgetCapabilitiesAsync()).Any(cap => cap.Size == widgetToUpdate.WidgetSize))
                     {
-                        var newDefaultSize = WidgetHelpers.GetDefaultWidgetSize(newDef.GetWidgetCapabilities());
+                        var newDefaultSize = WidgetHelpers.GetDefaultWidgetSize(await comSafeNewDef.GetWidgetCapabilitiesAsync());
                         widgetToUpdate.WidgetSize = newDefaultSize;
                         await widgetToUpdate.Widget.SetSizeAsync(newDefaultSize);
                     }

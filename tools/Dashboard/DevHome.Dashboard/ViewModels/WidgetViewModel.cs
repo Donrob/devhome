@@ -35,7 +35,7 @@ namespace DevHome.Dashboard.ViewModels;
 public delegate WidgetViewModel WidgetViewModelFactory(
     ComSafeWidget widget,
     WidgetSize widgetSize,
-    WidgetDefinition widgetDefinition);
+    ComSafeWidgetDefinition widgetDefinition);
 
 public partial class WidgetViewModel : ObservableObject
 {
@@ -50,7 +50,7 @@ public partial class WidgetViewModel : ObservableObject
     private ComSafeWidget _widget;
 
     [ObservableProperty]
-    private WidgetDefinition _widgetDefinition;
+    private ComSafeWidgetDefinition _widgetDefinition;
 
     [ObservableProperty]
     private WidgetSize _widgetSize;
@@ -84,7 +84,7 @@ public partial class WidgetViewModel : ObservableObject
         }
     }
 
-    partial void OnWidgetDefinitionChanged(WidgetDefinition value)
+    partial void OnWidgetDefinitionChanged(ComSafeWidgetDefinition value)
     {
         if (WidgetDefinition != null)
         {
@@ -97,7 +97,7 @@ public partial class WidgetViewModel : ObservableObject
     public WidgetViewModel(
         ComSafeWidget widget,
         WidgetSize widgetSize,
-        WidgetDefinition widgetDefinition,
+        ComSafeWidgetDefinition widgetDefinition,
         WidgetAdaptiveCardRenderingService adaptiveCardRenderingService,
         WindowEx windowEx)
     {
