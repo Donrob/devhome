@@ -301,6 +301,7 @@ public partial class EnvironmentCreationOptionsViewModel : SetupPageViewModelBas
     {
         var renderer = await _adaptiveCardRenderingService.GetRendererAsync();
         renderer.ElementRenderers.Set(DevHomeSettingsCardChoiceSet.AdaptiveElementType, new ItemsViewChoiceSet("SettingsCardWithButtonThatLaunchesContentDialog"));
+        renderer.ElementRenderers.Set("Input.ChoiceSet", new CompactChoiceSetWithSubtitle());
 
         // We need to keep the same renderer for the ActionSet that is hooked up to the orchestrator as it will have the adaptive card
         // context needed to invoke the adaptive card actions from outside the adaptive card.

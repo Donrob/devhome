@@ -23,4 +23,11 @@
             </controls:SettingsCard>
         </ItemContainer>
     </DataTemplate>
+
+    <DataTemplate x:Key="ChoiceSetWithSubtitleTemplate" x:DataType="cardModels:ChoiceSetWithSubtitleData">
+        <StackPanel>
+            <TextBlock Text="{Binding Title}" />
+            <TextBlock Text="{Binding Subtitle}" Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
+        </StackPanel>
+    </DataTemplate>
 </ResourceDictionary>
